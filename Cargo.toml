@@ -1,0 +1,22 @@
+[package]
+name = "latex-anim"
+version = "0.1.0"
+authors = ["Sébastien Wagener <sebastien.wagener@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#resvg = "0.14.1"
+#usvg = "0.14.1"
+#tiny-skia = "0.5.1"
+#svgtypes = "0.5.0"
+
+usvg = "0.4" # 0.14.1
+lyon = { version = "0.17.5", features = ["svg", "serialization"]}
+
+clap = "2.32.0"
+wgpu = "0.6.0"
+winit = "0.23"
+futures = "0.3.5"
+bytemuck = "1.2.0"
