@@ -110,8 +110,6 @@ fn main() {
             }
             prev_transform = t;
 
-            let transform_idx = transforms_and_primitives.transforms.len() as u32 - 1;
-
             if let Some(ref fill) = p.fill {
                 // fall back to always use color fill
                 // no gradients (yet?)
@@ -120,11 +118,7 @@ fn main() {
                     _ => FALLBACK_COLOR,
                 };
 
-                transforms_and_primitives.primitives.push(GpuPrimitive::new(
-                    transform_idx,
-                    color,
-                    fill.opacity.value() as f32,
-                ));
+                transforms_and_primitives.add_primitive(color, fill.opacity.value() as f32);
 
                 fill_tess
                     .tessellate(
@@ -140,11 +134,8 @@ fn main() {
 
             if let Some(ref stroke) = p.stroke {
                 let (stroke_color, stroke_opts) = convert_stroke(stroke);
-                transforms_and_primitives.primitives.push(GpuPrimitive::new(
-                    transform_idx,
-                    stroke_color,
-                    stroke.opacity.value() as f32,
-                ));
+                transforms_and_primitives
+                    .add_primitive(stroke_color, stroke.opacity.value() as f32);
                 let _ = stroke_tess.tessellate(
                     convert_path(p),
                     &stroke_opts.with_tolerance(0.01),
@@ -505,6 +496,13 @@ impl TransformsAndPrimitives {
         VertexCtor {
             prim_id: self.primitives.len() as u32 - 1,
         }
+    }
+
+    // Adds a primitive with the current transform
+    pub fn add_primitive(&mut self, color: usvg::Color, alpha: f32) {
+        let transform_idx = self.transforms.len() as u32 - 1;
+        self.primitives
+            .push(GpuPrimitive::new(transform_idx, color, alpha));
     }
 }
 
