@@ -90,60 +90,13 @@ fn main() {
     let rtree = usvg::Tree::from_file(&filename, &opt).unwrap();
     let mut transforms_and_primitives = TransformsAndPrimitives::new();
 
-    let mut prev_transform = usvg::Transform {
-        a: NAN,
-        b: NAN,
-        c: NAN,
-        d: NAN,
-        e: NAN,
-        f: NAN,
-    };
-    let view_box = rtree.svg_node().view_box;
-    for node in rtree.root().descendants() {
-        if let usvg::NodeKind::Path(ref p) = *node.borrow() {
-            let t = node.transform();
-            if t != prev_transform {
-                transforms_and_primitives.transforms.push(GpuTransform {
-                    data0: [t.a as f32, t.b as f32, t.c as f32, t.d as f32],
-                    data1: [t.e as f32, t.f as f32, 0.0, 0.0],
-                });
-            }
-            prev_transform = t;
-
-            if let Some(ref fill) = p.fill {
-                // fall back to always use color fill
-                // no gradients (yet?)
-                let color = match fill.paint {
-                    usvg::Paint::Color(c) => c,
-                    _ => FALLBACK_COLOR,
-                };
-
-                let vertex =
-                    transforms_and_primitives.add_primitive(color, fill.opacity.value() as f32);
-
-                fill_tess
-                    .tessellate(
-                        convert_path(p),
-                        &FillOptions::tolerance(0.01),
-                        &mut BuffersBuilder::new(&mut mesh, vertex),
-                    )
-                    .expect("Error during tesselation!");
-            }
-
-            if let Some(ref stroke) = p.stroke {
-                let (stroke_color, stroke_opts) = convert_stroke(stroke);
-                let vertex = transforms_and_primitives
-                    .add_primitive(stroke_color, stroke.opacity.value() as f32);
-                stroke_tess
-                    .tessellate(
-                        convert_path(p),
-                        &stroke_opts.with_tolerance(0.01),
-                        &mut BuffersBuilder::new(&mut mesh, vertex),
-                    )
-                    .expect("Error during tesselation!");
-            }
-        }
-    }
+    tesselate_svg(
+        &rtree,
+        &mut transforms_and_primitives,
+        &mut mesh,
+        &mut fill_tess,
+        &mut stroke_tess,
+    );
 
     if app.is_present("TESS_ONLY") {
         return;
@@ -159,6 +112,7 @@ fn main() {
 
     // Initialize wgpu and send some data to the GPU.
 
+    let view_box = rtree.svg_node().view_box;
     let vb_width = view_box.rect.size().width as f32;
     let vb_height = view_box.rect.size().height as f32;
     let scale = vb_width / vb_height;
@@ -496,6 +450,68 @@ impl TransformsAndPrimitives {
             .push(GpuPrimitive::new(transform_idx, color, alpha));
         VertexCtor {
             prim_id: self.primitives.len() as u32 - 1,
+        }
+    }
+}
+
+fn tesselate_svg(
+    rtree: &usvg::Tree,
+    transforms_and_primitives: &mut TransformsAndPrimitives,
+    mesh: &mut VertexBuffers<GpuVertex, u32>,
+    fill_tess: &mut FillTessellator,
+    stroke_tess: &mut StrokeTessellator,
+) {
+    let mut prev_transform = usvg::Transform {
+        a: NAN,
+        b: NAN,
+        c: NAN,
+        d: NAN,
+        e: NAN,
+        f: NAN,
+    };
+    for node in rtree.root().descendants() {
+        if let usvg::NodeKind::Path(ref p) = *node.borrow() {
+            let t = node.transform();
+            if t != prev_transform {
+                transforms_and_primitives.transforms.push(GpuTransform {
+                    data0: [t.a as f32, t.b as f32, t.c as f32, t.d as f32],
+                    data1: [t.e as f32, t.f as f32, 0.0, 0.0],
+                });
+            }
+            prev_transform = t;
+
+            if let Some(ref fill) = p.fill {
+                // fall back to always use color fill
+                // no gradients (yet?)
+                let color = match fill.paint {
+                    usvg::Paint::Color(c) => c,
+                    _ => FALLBACK_COLOR,
+                };
+
+                let vertex =
+                    transforms_and_primitives.add_primitive(color, fill.opacity.value() as f32);
+
+                fill_tess
+                    .tessellate(
+                        convert_path(p),
+                        &FillOptions::tolerance(0.01),
+                        &mut BuffersBuilder::new(mesh, vertex),
+                    )
+                    .expect("Error during tesselation!");
+            }
+
+            if let Some(ref stroke) = p.stroke {
+                let (stroke_color, stroke_opts) = convert_stroke(stroke);
+                let vertex = transforms_and_primitives
+                    .add_primitive(stroke_color, stroke.opacity.value() as f32);
+                stroke_tess
+                    .tessellate(
+                        convert_path(p),
+                        &stroke_opts.with_tolerance(0.01),
+                        &mut BuffersBuilder::new(mesh, vertex),
+                    )
+                    .expect("Error during tesselation!");
+            }
         }
     }
 }
