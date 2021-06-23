@@ -88,8 +88,7 @@ fn main() {
 
     let opt = usvg::Options::default();
     let rtree = usvg::Tree::from_file(&filename, &opt).unwrap();
-    let mut transforms = Vec::new();
-    let mut primitives = Vec::new();
+    let mut transforms_and_primitives = TransformsAndPrimitives::new();
 
     let mut prev_transform = usvg::Transform {
         a: NAN,
@@ -104,14 +103,14 @@ fn main() {
         if let usvg::NodeKind::Path(ref p) = *node.borrow() {
             let t = node.transform();
             if t != prev_transform {
-                transforms.push(GpuTransform {
+                transforms_and_primitives.transforms.push(GpuTransform {
                     data0: [t.a as f32, t.b as f32, t.c as f32, t.d as f32],
                     data1: [t.e as f32, t.f as f32, 0.0, 0.0],
                 });
             }
             prev_transform = t;
 
-            let transform_idx = transforms.len() as u32 - 1;
+            let transform_idx = transforms_and_primitives.transforms.len() as u32 - 1;
 
             if let Some(ref fill) = p.fill {
                 // fall back to always use color fill
@@ -121,7 +120,7 @@ fn main() {
                     _ => FALLBACK_COLOR,
                 };
 
-                primitives.push(GpuPrimitive::new(
+                transforms_and_primitives.primitives.push(GpuPrimitive::new(
                     transform_idx,
                     color,
                     fill.opacity.value() as f32,
@@ -133,9 +132,7 @@ fn main() {
                         &FillOptions::tolerance(0.01),
                         &mut BuffersBuilder::new(
                             &mut mesh,
-                            VertexCtor {
-                                prim_id: primitives.len() as u32 - 1,
-                            },
+                            transforms_and_primitives.new_vertex_ctor(),
                         ),
                     )
                     .expect("Error during tesselation!");
@@ -143,7 +140,7 @@ fn main() {
 
             if let Some(ref stroke) = p.stroke {
                 let (stroke_color, stroke_opts) = convert_stroke(stroke);
-                primitives.push(GpuPrimitive::new(
+                transforms_and_primitives.primitives.push(GpuPrimitive::new(
                     transform_idx,
                     stroke_color,
                     stroke.opacity.value() as f32,
@@ -153,9 +150,7 @@ fn main() {
                     &stroke_opts.with_tolerance(0.01),
                     &mut BuffersBuilder::new(
                         &mut mesh,
-                        VertexCtor {
-                            prim_id: primitives.len() as u32 - 1,
-                        },
+                        transforms_and_primitives.new_vertex_ctor(),
                     ),
                 );
             }
@@ -388,9 +383,17 @@ fn main() {
     render_pipeline_descriptor.primitive_topology = wgpu::PrimitiveTopology::LineList;
     let wireframe_render_pipeline = device.create_render_pipeline(&render_pipeline_descriptor);
 
-    queue.write_buffer(&transforms_ubo, 0, bytemuck::cast_slice(&transforms));
+    queue.write_buffer(
+        &transforms_ubo,
+        0,
+        bytemuck::cast_slice(&transforms_and_primitives.transforms),
+    );
 
-    queue.write_buffer(&prims_ubo, 0, bytemuck::cast_slice(&primitives));
+    queue.write_buffer(
+        &prims_ubo,
+        0,
+        bytemuck::cast_slice(&transforms_and_primitives.primitives),
+    );
 
     // The main loop.
 
@@ -482,6 +485,27 @@ fn main() {
 
         queue.submit(Some(encoder.finish()));
     });
+}
+
+pub struct TransformsAndPrimitives {
+    // TODO find better name
+    pub transforms: Vec<GpuTransform>,
+    pub primitives: Vec<GpuPrimitive>,
+}
+
+impl TransformsAndPrimitives {
+    pub fn new() -> TransformsAndPrimitives {
+        TransformsAndPrimitives {
+            transforms: Vec::new(),
+            primitives: Vec::new(),
+        }
+    }
+
+    pub fn new_vertex_ctor(&self) -> VertexCtor {
+        VertexCtor {
+            prim_id: self.primitives.len() as u32 - 1,
+        }
+    }
 }
 
 #[repr(C)]
