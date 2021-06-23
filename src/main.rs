@@ -42,6 +42,12 @@ struct Opts {
     msaa_samples: u32,
 }
 
+fn load_svg_file<P: AsRef<std::path::Path>>(p: P) -> Result<usvg::Tree, usvg::Error> {
+    let opt = usvg::Options::default();
+    let svg_data = std::fs::read(p).unwrap();
+    usvg::Tree::from_data(&svg_data, &opt)
+}
+
 fn main() {
     // Grab some parameters from the command line.
     let opts: Opts = Opts::parse();
@@ -54,12 +60,10 @@ fn main() {
     let mut stroke_tess = StrokeTessellator::new();
     let mut mesh: VertexBuffers<_, u32> = VertexBuffers::new();
 
-    let opt = usvg::Options::default();
-
     let mut transforms_and_primitives = TransformsAndPrimitives::new();
 
     for i in 0..31 {
-        let rtree = usvg::Tree::from_file(format!("data/terminal-{}.svg", i), &opt).unwrap();
+        let rtree = load_svg_file(format!("data/terminal-{}.svg", i)).unwrap();
         tesselate_svg(
             &rtree,
             &mut transforms_and_primitives,
@@ -68,7 +72,7 @@ fn main() {
             &mut stroke_tess,
         );
     }
-    let rtree = usvg::Tree::from_file("data/terminal-0.svg", &opt).unwrap();
+    let rtree = load_svg_file("data/terminal-0.svg").unwrap();
 
     println!(
         "Finished tesselation: {} vertices, {} indices",
@@ -81,8 +85,8 @@ fn main() {
     // Initialize wgpu and send some data to the GPU.
 
     let view_box = rtree.svg_node().view_box;
-    let vb_width = view_box.rect.size().width as f32;
-    let vb_height = view_box.rect.size().height as f32;
+    let vb_width = view_box.rect.size().width() as f32;
+    let vb_height = view_box.rect.size().height() as f32;
     let scale = vb_width / vb_height;
 
     let (width, height) = if scale < 1.0 {
@@ -739,7 +743,7 @@ impl<'l> Iterator for PathConvIter<'l> {
 
 pub fn convert_path<'a>(p: &'a usvg::Path) -> PathConvIter<'a> {
     PathConvIter {
-        iter: p.segments.iter(),
+        iter: p.data.iter(),
         first: Point::new(0.0, 0.0),
         prev: Point::new(0.0, 0.0),
         deferred: None,

@@ -12,7 +12,7 @@ edition = "2018"
 #tiny-skia = "0.5.1"
 #svgtypes = "0.5.0"
 
-usvg = "0.4" # 0.14.1
+usvg = "0.15.0"
 lyon = { version = "0.17.5", features = ["svg", "serialization"]}
 
 clap = "3.0.0-beta.2"
