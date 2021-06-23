@@ -478,7 +478,7 @@ fn tesselate_svg(
                     .add_primitive(stroke_color, stroke.opacity.value() as f32);
                 stroke_tess
                     .tessellate(
-                        convert_path(p),
+                        convert_path(p).flattened(0.01),
                         &stroke_opts.with_tolerance(0.01),
                         &mut BuffersBuilder::new(mesh, vertex),
                     )
