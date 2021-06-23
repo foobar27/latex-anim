@@ -37,7 +37,7 @@ pub const FALLBACK_COLOR: usvg::Color = usvg::Color {
 fn main() {
     // Grab some parameters from the command line.
 
-    let app = App::new("Lyon svg_render example")
+    let app = App::new("latex-anim")
         .version("0.1")
         .arg(
             Arg::with_name("MSAA")
@@ -53,7 +53,7 @@ fn main() {
                 .help("SVG or SVGZ file")
                 .value_name("INPUT")
                 .takes_value(true)
-                .required(true),
+                .required(false),
         )
         .arg(
             Arg::with_name("TESS_ONLY")
@@ -87,16 +87,20 @@ fn main() {
     let mut mesh: VertexBuffers<_, u32> = VertexBuffers::new();
 
     let opt = usvg::Options::default();
-    let rtree = usvg::Tree::from_file(&filename, &opt).unwrap();
+
     let mut transforms_and_primitives = TransformsAndPrimitives::new();
 
-    tesselate_svg(
-        &rtree,
-        &mut transforms_and_primitives,
-        &mut mesh,
-        &mut fill_tess,
-        &mut stroke_tess,
-    );
+    for i in 0..31 {
+        let rtree = usvg::Tree::from_file(format!("data/terminal-{}.svg", i), &opt).unwrap();
+        tesselate_svg(
+            &rtree,
+            &mut transforms_and_primitives,
+            &mut mesh,
+            &mut fill_tess,
+            &mut stroke_tess,
+        );
+    }
+    let rtree = usvg::Tree::from_file("data/terminal-0.svg", &opt).unwrap();
 
     if app.is_present("TESS_ONLY") {
         return;
