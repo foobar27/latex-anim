@@ -134,11 +134,13 @@ fn main() {
                 let (stroke_color, stroke_opts) = convert_stroke(stroke);
                 let vertex = transforms_and_primitives
                     .add_primitive(stroke_color, stroke.opacity.value() as f32);
-                let _ = stroke_tess.tessellate(
-                    convert_path(p),
-                    &stroke_opts.with_tolerance(0.01),
-                    &mut BuffersBuilder::new(&mut mesh, vertex),
-                );
+                stroke_tess
+                    .tessellate(
+                        convert_path(p),
+                        &stroke_opts.with_tolerance(0.01),
+                        &mut BuffersBuilder::new(&mut mesh, vertex),
+                    )
+                    .expect("Error during tesselation!");
             }
         }
     }
