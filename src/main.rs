@@ -1,4 +1,4 @@
-use clap::*;
+use clap::{AppSettings, Clap};
 use lyon::math::Point;
 use lyon::path::PathEvent;
 use lyon::tessellation::geometry_builder::*;
@@ -34,53 +34,21 @@ pub const FALLBACK_COLOR: usvg::Color = usvg::Color {
 //
 // Most of the code in this example is related to working with the GPU.
 
+#[derive(Clap)]
+#[clap(version = "0.1", author = "Sébastien Wagener. <s.wagener@gmail.com>")]
+#[clap(setting = AppSettings::ColoredHelp)]
+struct Opts {
+    #[clap(short, long, default_value = "8")]
+    msaa_samples: u32,
+}
+
 fn main() {
     // Grab some parameters from the command line.
+    let opts: Opts = Opts::parse();
 
-    let app = App::new("latex-anim")
-        .version("0.1")
-        .arg(
-            Arg::with_name("MSAA")
-                .long("msaa")
-                .short("m")
-                .help("Sets MSAA sample count (integer)")
-                .value_name("SAMPLES")
-                .takes_value(true)
-                .required(false),
-        )
-        .arg(
-            Arg::with_name("INPUT")
-                .help("SVG or SVGZ file")
-                .value_name("INPUT")
-                .takes_value(true)
-                .required(false),
-        )
-        .arg(
-            Arg::with_name("TESS_ONLY")
-                .help("Perform the tessellation and exit without rendering")
-                .value_name("TESS_ONLY")
-                .long("tessellate-only")
-                .short("t")
-                .takes_value(false)
-                .required(false),
-        )
-        .get_matches();
-
-    let msaa_samples = if let Some(msaa) = app.value_of("MSAA") {
-        match msaa.parse::<u32>() {
-            Ok(n) => n.max(1),
-            Err(_) => {
-                println!("ERROR: `{}` is not a number", msaa);
-                std::process::exit(1);
-            }
-        }
-    } else {
-        1
-    };
+    let msaa_samples = opts.msaa_samples;
 
     // Parse and tessellate the geometry
-
-    let filename = app.value_of("INPUT").unwrap();
 
     let mut fill_tess = FillTessellator::new();
     let mut stroke_tess = StrokeTessellator::new();
@@ -101,10 +69,6 @@ fn main() {
         );
     }
     let rtree = usvg::Tree::from_file("data/terminal-0.svg", &opt).unwrap();
-
-    if app.is_present("TESS_ONLY") {
-        return;
-    }
 
     println!(
         "Finished tesselation: {} vertices, {} indices",
